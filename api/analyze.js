@@ -25,7 +25,6 @@ export default async function handler(req, res) {
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-  // Retry up to 3 times to automatically absorb transient 503 capacity spikes
   const maxRetries = 3;
   let lastErrorMessage = "Service temporarily unavailable. Please try again.";
 
@@ -43,7 +42,6 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
       }
 
-      // Check if upstream model is experiencing transient demand spikes or rate limits
       if ((response.status === 503 || response.status === 429) && attempt < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
         continue;
