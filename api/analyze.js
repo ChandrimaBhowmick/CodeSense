@@ -13,28 +13,30 @@ export default async function handler(req, res) {
   const payload = {
     systemInstruction: {
       parts: [{
-        text: "You are an automated code analysis engine. Directly output clean, structured Markdown matching the requested format. Never output internal thought processes, planning stages, draft revisions, or constraint checklists."
+        text: "You are an automated code analysis engine. Directly output clean, concise, structured Markdown matching the requested format. Avoid redundant prose. Never output internal thought processes or planning drafts."
       }]
     },
     contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
     generationConfig: {
-      maxOutputTokens: 600,
+      maxOutputTokens: 500,
       temperature: 0.1
     }
   };
 
-  // Tiered fallback sequence: if flash is experiencing peak demand, fall back to flash-lite
-  const models = ["gemini-3.8-flash", "gemini-3.8-flash-lite"];
+  // Prioritize flash-lite for near-instant latency and high throughput
+  const models = ["gemini-3.8-flash-lite", "gemini-3.8-flash"];
   let lastErrorMessage = "Service temporarily unavailable. Please try again.";
 
   for (const model of models) {
     try {
+      // Set an 8-second cutoff per model to avoid hitting Vercel's serverless timeout
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(8000)
         }
       );
 
@@ -44,18 +46,17 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
       }
 
-      // Check for transient high-demand (503) or rate-limit (429) errors
+      // If high demand or throttled, loop to the next model immediately
       if (response.status === 503 || response.status === 429) {
-        lastErrorMessage = data.error?.message || "Model experiencing high demand.";
-        continue; // Try next model in candidate list
+        lastErrorMessage = data.error?.message || "Model busy, switching...";
+        continue;
       }
 
-      // If it's a structural client/auth error (e.g., 400 or 401), fail immediately
       return res.status(response.status).json({ error: data.error?.message || "Upstream model error" });
     } catch (err) {
-      lastErrorMessage = err.message;
+      lastErrorMessage = err.name === "TimeoutError" ? "Request timed out, trying backup..." : err.message;
     }
   }
 
-  return res.status(503).json({ error: lastErrorMessage });
+  return res.status(504).json({ error: lastErrorMessage });
 }
