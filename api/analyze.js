@@ -10,9 +10,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API key is not configured in environment variables." });
   }
 
-  // List of models to try in order if one experiences high demand/capacity limits
-  const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash"];
-
   const payload = {
     systemInstruction: {
       parts: [{
@@ -26,18 +23,19 @@ export default async function handler(req, res) {
     }
   };
 
-  let lastErrorMessage = "Service temporarily unavailable. Please try again.";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-  for (const model of candidateModels) {
+  // Retry up to 3 times with a short pause if Google returns high demand / rate limits
+  const maxRetries = 3;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
       const data = await response.json();
 
@@ -45,12 +43,25 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
       }
 
-      // If the model is overloaded (503/429) or not found, save error and try next candidate
-      lastErrorMessage = data.error?.message || `Upstream error with ${model}`;
+      // Check if it is a transient demand or rate limit issue (503 / 429)
+      const isTransient = response.status === 503 || response.status === 429;
+      lastError = data.error?.message || "Upstream model error";
+
+      if (isTransient && attempt < maxRetries) {
+        // Wait 1.5s on attempt 1, 3s on attempt 2
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        continue;
+      }
+
+      return res.status(response.status).json({ error: lastError });
     } catch (err) {
-      lastErrorMessage = err.message;
+      lastError = err.message;
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        continue;
+      }
     }
   }
 
-  return res.status(503).json({ error: lastErrorMessage });
+  return res.status(503).json({ error: lastError });
 }
