@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeSense – AI Code Explainer & Complexity Profiler</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-dark text-light min-vh-100 d-flex flex-column py-3">
+
+  <div class="container-fluid px-lg-5 flex-grow-1 d-flex flex-column">
+    <!-- Header -->
+    <header class="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom border-secondary">
+      <div>
+        <h3 class="fw-bold text-primary m-0">CodeSense</h3>
+        <small class="text-secondary">AI Code Explainer & Big-O Complexity Profiler</small>
+      </div>
+      <div>
+        <button id="loadSampleBtn" class="btn btn-sm btn-outline-secondary text-light me-2">Load Sample Code</button>
+        <button id="clearBtn" class="btn btn-sm btn-outline-danger">Clear</button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="row g-4 flex-grow-1">
+      
+      <!-- Left Column: Code Input -->
+      <div class="col-lg-6 d-flex flex-column">
+        <div class="card bg-secondary bg-opacity-10 border-secondary p-3 flex-grow-1 d-flex flex-column">
+          
+          <div class="row g-2 mb-3">
+            <div class="col-sm-6">
+              <label for="languageSelect" class="form-label text-secondary small fw-semibold">LANGUAGE</label>
+              <select id="languageSelect" class="form-select bg-dark text-light border-secondary">
+                <option value="Java" selected>Java</option>
+                <option value="Python">Python</option>
+                <option value="C++">C++</option>
+                <option value="JavaScript">JavaScript</option>
+                <option value="PHP">PHP</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label for="actionSelect" class="form-label text-secondary small fw-semibold">ANALYSIS MODE</label>
+              <select id="actionSelect" class="form-select bg-dark text-light border-secondary">
+                <option value="explain" selected>Line-by-Line Explanation</option>
+                <option value="complexity">Time & Space Complexity (Big-O)</option>
+                <option value="bugs">Bug & Edge Case Detection</option>
+                <option value="optimize">Refactoring & Optimization</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="codeInput" class="form-label text-secondary small fw-semibold">SOURCE CODE</label>
+          <div class="flex-grow-1 d-flex flex-column mb-3 position-relative">
+            <textarea 
+              id="codeInput" 
+              class="form-control bg-dark text-light font-monospace border-secondary flex-grow-1 p-3" 
+              rows="15" 
+              placeholder="// Paste your source code here... (Supports Tab indentation)"
+              spellcheck="false"
+            ></textarea>
+          </div>
+
+          <button id="analyzeBtn" class="btn btn-primary w-100 fw-semibold py-2">
+            <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+            <span id="btnText">Analyze Snippet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Column: Formatted Output -->
+      <div class="col-lg-6 d-flex flex-column">
+        <div class="card bg-secondary bg-opacity-10 border-secondary p-3 flex-grow-1 d-flex flex-column">
+          
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-secondary small fw-semibold">ANALYSIS REPORT</span>
+            <button id="copyBtn" class="btn btn-sm btn-outline-light d-none">Copy Output</button>
+          </div>
+
+          <div id="outputContainer" class="p-3 bg-dark rounded border border-secondary flex-grow-1 overflow-auto text-light">
+            <div class="text-secondary text-center my-auto pt-5">
+              <p>Ready to analyze.</p>
+              <small>Paste your function or algorithm on the left, pick an analysis mode, and click <strong>Analyze Snippet</strong>.</small>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

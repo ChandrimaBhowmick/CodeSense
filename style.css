@@ -1,0 +1,59 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #0f1117 !important;
+}
+
+textarea#codeInput {
+  background-color: #161821 !important;
+  color: #e6e6e6 !important;
+  resize: none;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+textarea#codeInput:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+#outputContainer {
+  background-color: #161821 !important;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+#outputContainer h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #58a6ff;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 0.25rem;
+}
+
+#outputContainer pre {
+  background-color: #0d1117;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid #30363d;
+}
+
+#outputContainer code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  color: #ff7b72;
+}
+
+#outputContainer pre code {
+  color: #c9d1d9;
+}
+
+#outputContainer ul {
+  padding-left: 1.25rem;
+}
+
+#outputContainer li {
+  margin-bottom: 0.35rem;
+}
