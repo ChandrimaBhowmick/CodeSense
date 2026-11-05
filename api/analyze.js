@@ -23,19 +23,20 @@ export default async function handler(req, res) {
     }
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  // Tiered fallback sequence: if flash is experiencing peak demand, fall back to flash-lite
+  const models = ["gemini-3.8-flash", "gemini-3.8-flash-lite"];
+  let lastErrorMessage = "Service temporarily unavailable. Please try again.";
 
-  // Retry up to 3 times with a short pause if Google returns high demand / rate limits
-  const maxRetries = 3;
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  for (const model of models) {
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
 
       const data = await response.json();
 
@@ -43,25 +44,18 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
       }
 
-      // Check if it is a transient demand or rate limit issue (503 / 429)
-      const isTransient = response.status === 503 || response.status === 429;
-      lastError = data.error?.message || "Upstream model error";
-
-      if (isTransient && attempt < maxRetries) {
-        // Wait 1.5s on attempt 1, 3s on attempt 2
-        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
-        continue;
+      // Check for transient high-demand (503) or rate-limit (429) errors
+      if (response.status === 503 || response.status === 429) {
+        lastErrorMessage = data.error?.message || "Model experiencing high demand.";
+        continue; // Try next model in candidate list
       }
 
-      return res.status(response.status).json({ error: lastError });
+      // If it's a structural client/auth error (e.g., 400 or 401), fail immediately
+      return res.status(response.status).json({ error: data.error?.message || "Upstream model error" });
     } catch (err) {
-      lastError = err.message;
-      if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
-        continue;
-      }
+      lastErrorMessage = err.message;
     }
   }
 
-  return res.status(503).json({ error: lastError });
+  return res.status(503).json({ error: lastErrorMessage });
 }
