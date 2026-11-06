@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   const payload = {
-    model: "llama-3.1-70b-versatile",
+    model: "llama-3.1-8b-instant",
     messages: [
       {
         role: "system",
