@@ -1,63 +1,69 @@
 export default async function handler(req, res) {
+  // 1. Validate request method
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const { fullPrompt } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
 
+  // 2. Validate API key environment variable
   if (!apiKey) {
-    return res.status(500).json({ error: "API key is not configured in environment variables." });
+    return res.status(500).json({
+      error: "GROQ_API_KEY is not configured in Vercel environment variables."
+    });
   }
 
+  // 3. Build payload for Groq OpenAI-compatible endpoint
   const payload = {
-    systemInstruction: {
-      parts: [{
-        text: "You are an automated code analysis engine. Directly output clean, structured Markdown matching the requested format. Avoid conversational filler, self-introductions, or internal thinking steps."
-      }]
-    },
-    contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-    generationConfig: {
-      maxOutputTokens: 600,
-      temperature: 0.1
-    }
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an automated code analysis engine. Directly output clean, structured Markdown matching the requested format. Avoid conversational filler or internal thinking steps."
+      },
+      {
+        role: "user",
+        content: fullPrompt
+      }
+    ],
+    temperature: 0.2,
+    max_tokens: 700
   };
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
 
-  const maxRetries = 3;
-  let lastErrorMessage = "Service temporarily unavailable. Please try again.";
+    const data = await response.json();
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        return res.status(200).json(data);
-      }
-
-      if ((response.status === 503 || response.status === 429) && attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
-        continue;
-      }
-
+    if (!response.ok) {
       return res.status(response.status).json({
         error: data.error?.message || "Upstream model error"
       });
-    } catch (err) {
-      lastErrorMessage = err.message;
-      if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
-        continue;
-      }
     }
-  }
 
-  return res.status(503).json({ error: lastErrorMessage });
+    // 4. Map the response format to match what script.js expects
+    const textOutput = data.choices?.[0]?.message?.content || "";
+    return res.status(200).json({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: textOutput }]
+          }
+        }
+      ]
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message || "Internal server error"
+    });
+  }
 }
