@@ -19,14 +19,76 @@ document.addEventListener("DOMContentLoaded", () => {
     PHP: `function binarySearch($nums, $target) {\n    $left = 0;\n    $right = count($nums) - 1;\n    while ($left <= $right) {\n        $mid = intdiv($left + $right, 2);\n        if ($nums[$mid] === $target) return $mid;\n        if ($nums[$mid] < $target) $left = $mid + 1;\n        else $right = $mid - 1;\n    }\n    return -1;\n}`
   };
 
-  // Support Tab key inside the code textarea
+  // Smart Indentation & Tab key handling inside the code textarea
   codeInput.addEventListener("keydown", (e) => {
+    // 1. Handle Tab and Shift + Tab
     if (e.key === "Tab") {
       e.preventDefault();
       const start = codeInput.selectionStart;
       const end = codeInput.selectionEnd;
-      codeInput.value = codeInput.value.substring(0, start) + "    " + codeInput.value.substring(end);
-      codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+      const val = codeInput.value;
+
+      // Single cursor: insert 4 spaces
+      if (start === end) {
+        if (!e.shiftKey) {
+          codeInput.value = val.substring(0, start) + "    " + val.substring(end);
+          codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+        }
+        return;
+      }
+
+      // Multiline selection: indent or outdent lines
+      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+      const lineEnd = val.indexOf("\n", end) === -1 ? val.length : val.indexOf("\n", end);
+      const lines = val.substring(lineStart, lineEnd).split("\n");
+
+      let modifiedText = "";
+      let offset = 0;
+
+      if (e.shiftKey) {
+        // Shift + Tab: remove up to 4 spaces or 1 tab
+        modifiedText = lines
+          .map((line) => {
+            if (line.startsWith("    ")) {
+              offset -= 4;
+              return line.substring(4);
+            } else if (line.startsWith("\t")) {
+              offset -= 1;
+              return line.substring(1);
+            }
+            return line;
+          })
+          .join("\n");
+      } else {
+        // Tab: prepend 4 spaces
+        modifiedText = lines.map((line) => "    " + line).join("\n");
+        offset = lines.length * 4;
+      }
+
+      codeInput.value = val.substring(0, lineStart) + modifiedText + val.substring(lineEnd);
+      codeInput.selectionStart = start;
+      codeInput.selectionEnd = Math.max(start, end + offset);
+      return;
+    }
+
+    // 2. Handle Enter: replicate previous line's indent + auto-indent after '{', ':', '('
+    if (e.key === "Enter") {
+      const start = codeInput.selectionStart;
+      const val = codeInput.value;
+      const currentLineStart = val.lastIndexOf("\n", start - 1) + 1;
+      const currentLine = val.substring(currentLineStart, start);
+
+      const matchIndent = currentLine.match(/^\s*/);
+      let indent = matchIndent ? matchIndent[0] : "";
+
+      const trimmed = currentLine.trim();
+      if (trimmed.endsWith("{") || trimmed.endsWith(":") || trimmed.endsWith("(")) {
+        indent += "    ";
+      }
+
+      e.preventDefault();
+      codeInput.value = val.substring(0, start) + "\n" + indent + val.substring(start);
+      codeInput.selectionStart = codeInput.selectionEnd = start + 1 + indent.length;
     }
   });
 
@@ -91,7 +153,7 @@ Formatting Instructions:
     btnText.textContent = "Analyzing...";
     analyzeBtn.disabled = true;
     copyBtn.classList.add("d-none");
-    outputContainer.innerHTML = '<span class="text-secondary">Analyzing snippet with Gemini...</span>';
+    outputContainer.innerHTML = '<span class="text-secondary">Analyzing snippet...</span>';
 
     try {
       const response = await fetch("/api/analyze", {
