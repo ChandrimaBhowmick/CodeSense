@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   const payload = {
-    model: "llama-3.1-8b-instant",
+    model: "openai/gpt-oss-120b",
     messages: [
       {
         role: "system",
