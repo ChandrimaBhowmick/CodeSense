@@ -10,6 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearBtn = document.getElementById("clearBtn");
   const loadSampleBtn = document.getElementById("loadSampleBtn");
 
+  // Output terminal elements
+  const executionWindow = document.getElementById("executionWindow");
+  const statusBadge = document.getElementById("statusBadge");
+
   // Sample templates for quick testing
   const sampleSnippets = {
     Java: `public class BinarySearch {\n    public static int search(int[] nums, int target) {\n        int left = 0, right = nums.length - 1;\n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            if (nums[mid] == target) return mid;\n            if (nums[mid] < target) left = mid + 1;\n            else right = mid - 1;\n        }\n        return -1;\n    }\n}`,
@@ -101,7 +105,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // Clear inputs
   clearBtn.addEventListener("click", () => {
     codeInput.value = "";
-    outputContainer.innerHTML = '<div class="text-secondary text-center my-auto pt-5"><p>Ready to analyze.</p></div>';
+    outputContainer.innerHTML = '<div class="text-secondary text-center my-auto pt-4"><p>Ready to analyze.</p><small>Paste your function or algorithm on the left, pick an analysis mode, and click <strong>Analyze Snippet</strong>.</small></div>';
+    if (executionWindow) {
+      executionWindow.textContent = "Ready. Output or runtime/syntax errors will appear here.";
+    }
+    if (statusBadge) {
+      statusBadge.textContent = "Idle";
+      statusBadge.className = "badge bg-secondary";
+    }
     copyBtn.classList.add("d-none");
   });
 
@@ -140,13 +151,20 @@ Analyze the following ${language} code snippet:
 ${code}
 \`\`\`
 
+Strictly structure your response using these exact delimiters:
+
+===TERMINAL_START===
+[If syntax or logical runtime errors exist in the code, print the exact error message, line number hint, and error type like a real compiler/interpreter stderr. If the code is correct, display what the simulated execution/standard output produces or what the function returns when executed with typical arguments. Keep this under 4 lines.]
+===TERMINAL_END===
+
+===ANALYSIS_START===
 Task:
 ${instruction}
+===ANALYSIS_END===
 
 Formatting Instructions:
-- Output only the final response formatted in clean Markdown.
-- Do not print checklists, internal reflections, self-evaluations, or rules.
-- Be direct, technical, and concise.
+- Output only the delimited sections.
+- Keep the terminal block raw, technical, and unadorned (do not wrap it inside markdown backticks).
 `;
 
     btnSpinner.classList.remove("d-none");
@@ -154,6 +172,14 @@ Formatting Instructions:
     analyzeBtn.disabled = true;
     copyBtn.classList.add("d-none");
     outputContainer.innerHTML = '<span class="text-secondary">Analyzing snippet...</span>';
+    
+    if (executionWindow) {
+      executionWindow.textContent = "Running diagnostics and executing simulation...";
+    }
+    if (statusBadge) {
+      statusBadge.textContent = "Running";
+      statusBadge.className = "badge bg-warning text-dark";
+    }
 
     try {
       const response = await fetch("/api/analyze", {
@@ -168,16 +194,38 @@ Formatting Instructions:
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
-      const generatedMarkdown = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const rawResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-      if (generatedMarkdown) {
-        outputContainer.innerHTML = marked.parse(generatedMarkdown);
-        copyBtn.classList.remove("d-none");
-      } else {
-        outputContainer.innerHTML = '<span class="text-danger">No response received. Please check your snippet and try again.</span>';
+      // Extract terminal content and analysis markdown
+      const terminalMatch = rawResponse.match(/===TERMINAL_START===([\s\S]*?)===TERMINAL_END===/);
+      const analysisMatch = rawResponse.match(/===ANALYSIS_START===([\s\S]*?)===ANALYSIS_END===/);
+
+      const terminalText = terminalMatch ? terminalMatch[1].trim() : "Execution completed with no standard output.";
+      const analysisText = analysisMatch ? analysisMatch[1].trim() : rawResponse;
+
+      // Update Terminal Output Window
+      if (executionWindow) {
+        executionWindow.textContent = terminalText;
+        const isError = /error|exception|syntaxerror|typeerror|fault|traceback/i.test(terminalText);
+        if (statusBadge) {
+          statusBadge.textContent = isError ? "Error Detected" : "Success (0)";
+          statusBadge.className = isError ? "badge bg-danger" : "badge bg-success";
+        }
       }
+
+      // Update Analysis Window
+      outputContainer.innerHTML = marked.parse(analysisText);
+      copyBtn.classList.remove("d-none");
+
     } catch (err) {
       outputContainer.innerHTML = `<span class="text-danger"><strong>Error:</strong> ${err.message}</span>`;
+      if (executionWindow) {
+        executionWindow.textContent = `Process terminated with error: ${err.message}`;
+      }
+      if (statusBadge) {
+        statusBadge.textContent = "Failed";
+        statusBadge.className = "badge bg-danger";
+      }
     } finally {
       btnSpinner.classList.add("d-none");
       btnText.textContent = "Analyze Snippet";
